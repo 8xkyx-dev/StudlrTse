@@ -1,4 +1,5 @@
 
+
 name: Build StudlrTse APK
 
 on:
@@ -14,11 +15,14 @@ permissions:
 env:
   JAVA_VERSION: '17'
   ANDROID_PLATFORM: '35'
+  ANDROID_HOME: /usr/local/lib/android/sdk
+  ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
 jobs:
   build:
     name: Build debug APK
     runs-on: ubuntu-latest
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -27,18 +31,36 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: ${{ env.JAVA_VERSION }}
+          java-version: '17'
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Locate Android SDK manager
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then
+            SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)"
+          fi
+          if [ ! -x "$SDKMANAGER" ]; then
+            echo "Android sdkmanager was not found."
+            exit 1
+          fi
+          echo "SDKMANAGER=$SDKMANAGER" >> "$GITHUB_ENV"
+          echo "Found Android SDK manager."
 
+      - name: Accept Android SDK licences
+        run: |
+          yes | "$SDKMANAGER" --licenses
+          
       - name: Install Android SDK packages
-        run: sdkmanager "platform-tools" "platforms;android-${ANDROID_PLATFORM}" "build-tools;35.0.0"
+        run: |
+          "$SDKMANAGER" --install \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
 
       - name: Extract Android project
         run: |
@@ -58,4 +80,3 @@ jobs:
           path: ${{ runner.temp }}/studlrtse/StudlrTse/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
-
